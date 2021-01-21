@@ -3,9 +3,13 @@ $currentCon = Get-AzContext
 $subErc = @()
 $subVngs = @()
 $subVngConns = @()
+$subLngs = @()
+$subVwan = @()
+$subVhubs = @()
 foreach ($sub in $subscriptions) {
     Select-AzSubscription $sub.Id | Out-Null
     $thisSubVnets = Get-AzVirtualNetwork
+    $thisSubResources = Get-AzResource
     $subVnets += $thisSubVnets
     foreach ($vnet in $thisSubVnets) {
         $subVngList = ($vnet.Subnets | where Name -eq 'GatewaySubnet').Ipconfigurations.Id
@@ -16,10 +20,16 @@ foreach ($sub in $subscriptions) {
             $subVngConns += Get-AzVirtualNetworkGatewayConnection -ResourceGroupName $vng.Split("/")[4] | where VirtualNetworkGateway1Text -eq $vng1text
         }
     }
+    foreach ($thisLngs in ($thisSubResources | where ResourceType -eq "Microsoft.Network/localNetworkGateways")) {
+        $subLngs += Get-AzLocalNetworkGateway -ResourceGroupName $thisLngs.ResourceGroupName -Name $thisLngs.Name
+    }
     
     $subErc += Get-AzExpressRouteCircuit -WarningAction silentlyContinue
-    # $subVwan += Get-AzVirtualWan
-    # foreach
+    $thisSubVwan = Get-AzVirtualWan
+    $subVwan += $thisSubVwan
+    foreach ($vWan in $subVwan) {
+        $subVhubs += Get-AzVirtualHub -ResourceGroupName ($vWan.Id.Split("/")[4])
+    }
 }
 Select-AzSubscription $currentCon.Subscription | Out-Null
 $output = @()
@@ -49,6 +59,10 @@ foreach ($vnet in $subVnets) {
             }
         } else {
             $peerName = (($peering.RemoteVirtualNetwork.Id).Split("/"))[8] -Replace '-(?:[0-9]{1,3}\.){3,4}[0-9]{1,3}', ''
+            if ($peername -like "HV_*") {
+                $vHubname = $peerName.Split("_")[1]
+                $peerName = $vhubName.Substring(0,($vHubname.Length)-1)
+            }
         }
         if ($vnetList -contains $peerName) {
 
@@ -71,6 +85,14 @@ foreach ($erc in $subErc) {
     $output += "        type $($erc.Type.Replace("/","-").Replace(".","-"))"
     $output += "    }"
 }
+foreach ($lng in $subLngs) {
+    $output += "    $($lng.name) {"
+    $output += "        resourcegroup $($lng.ResourceGroupName.Replace(".","-"))"
+    $output += "        subscription $(($subscriptions | where Id -eq $lng.Id.Substring(15,36)).Name.Replace(" ","-").Replace("/","-"))"
+    $output += "        location $($lng.location)"
+    $output += "        type $($lng.Type.Replace("/","-").Replace(".","-"))"
+    $output += "    }"
+}
 foreach ($vng in $subVngs) {
     $output += "    $($vng.name) {"
     $output += "        resourcegroup $($vng.ResourceGroupName.Replace(".","-"))"
@@ -90,5 +112,18 @@ foreach ($vngConn in $subVngConns) {
     } elseif ($vngConn.Peer) {
         $output += "    $($vngConn.VirtualNetworkGateway1.Id.Split("/")[8]) ||--|| $($vngConn.Peer.Id.Split("/")[8]) : connection"
     }
+}
+foreach ($vHub in $subVhubs) {
+    $vhubName = $vHub.Name -Replace '-(?:[0-9]{1,3}\.){3,4}[0-9]{1,3}', ''
+    $vwanName = $vHub.VirtualWan.Id.Split("/")[8]
+    $output += "    $($vHubName) {"
+    $output += "        resourcegroup $($vHub.ResourceGroupName.Replace(".","-"))"
+    $output += "        subscription $(($subscriptions | where Id -eq $vHub.Id.Substring(15,36)).Name.Replace(" ","-").Replace("/","-"))"
+    $output += "        location $($vHub.location)"
+    $output += "        type $($vHub.Type.Replace("/","-").Replace(".","-"))-$vwanName"
+    $output += "    }"
+    #foreach ($vnetConn in $vHub.VirtualNetworkConnections) {
+    #
+    #}
 }
 $output
