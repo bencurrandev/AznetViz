@@ -60,57 +60,52 @@ $vnetList = @()
 $lngList = @()
 $vhubList = @()
 $output += "erDiagram"
-foreach ($vnet in $subVnets) {
-    # write-host "Processing $($vnet.Name) in $(($subscriptions | Where-Object Id -eq $vnet.Id.Substring(15,36)).Name.Replace(" ","-"))"
-    if ($vnet.VirtualNetworkPeerings.count -gt 0) { # Removes VNets not connected to anything
-        if ($vnet.DhcpOptions) {
-            $vnetName = $vnet.Name -Replace '-(?:[0-9]{1,3}\.){3,4}[0-9]{1,3}', ''
-            if ($vnetList -contains $vnetName) {
-                $vnetName = $vnetName + "-Workstations" # I only put this in because for some reason FRC PRD has two Vnets with the same name
-            }
-        } else { 
-            $vnetName = $vnet.Name -Replace '-(?:[0-9]{1,3}\.){3,4}[0-9]{1,3}', '-OffNet'
-        }
-        $vnetList += $vnetName
-        $output += "    $($vnetName) {"
-        $output += "        resourcegroup $($vnet.ResourceGroupName.Replace(".","-"))"
-        $output += "        subscription $(($subscriptions | Where-Object Id -eq $vnet.Id.Substring(15,36)).Name.Replace(" ","-").Replace("/","-"))"
-        $output += "        location $($vnet.location)"
-        $output += "        type $($vnet.Type.Replace("/","-").Replace(".","-"))"
-        $output += "        ipconnected x$($vnet.Subnets.IpConfigurations.count)"
-        $output += "    }"
-        foreach ($peering in $vnet.VirtualNetworkPeerings) {
-            $peervNet = $subVnets | Where-Object Id -eq $peering.RemoteVirtualNetwork.Id
-            if ($peervNet) {
-                if ($peervNet.DhcpOptions) {
-                    $peerName = $peervNet.Name -Replace '-(?:[0-9]{1,3}\.){3,4}[0-9]{1,3}', ''
-                } else { 
-                    $peerName = $peervNet.Name -Replace '-(?:[0-9]{1,3}\.){3,4}[0-9]{1,3}', '-OffNet'
-                }
-            } else {
-                $peerName = (($peering.RemoteVirtualNetwork.Id).Split("/"))[8] -Replace '-(?:[0-9]{1,3}\.){3,4}[0-9]{1,3}', ''
-                if ($vnetList -contains $peerName) {
-                    $peerName = $peerName + "-Workstations" # I only put this in because for some reason FRC PRD has two Vnets with the same name
-                }
-                if ($peername -like "HV_*") {
-                    $vHubname = $peerName.Split("_")[1] # This is required because the auto-generated name for vWan Hub peers is weird
-                    $peerName = $vhubName.Substring(0,($vHubname.Length)-1)
-                }
-            }
-            if ($vnetList -contains $peerName) {
+function SetVnetName ($setVnet) {
+    if ($setVnet.DhcpOptions) {
+        $vnetNameOut = $setVnet.Name
+    } else { 
+        $vnetNameOut = "$($setVnet.Name)-OffNet"
+    }
+    return $vnetNameOut
+}
 
+foreach ($vnet in $subVnets) {
+    $vnetName = SetVnetName $vnet
+    "g.AddV('vnet').property('ResourceId','$($vnet.ResourceGroupName.Replace("/","-"))_$($vnetName)').property('name','$($vnetName)').property('resourcegroup','$($vnet.ResourceGroupName.Replace("/","-"))').property('subscription','$(($subscriptions | Where-Object Id -eq ($vnet[0].Id.Split("/")[2])).Name.Replace(" ","-").Replace("/","-"))').property('location','$($vnet.location)').property('type','$($vnet.Type.Replace("/","-"))').property('ipconnected','$($vnet.Subnets.IpConfigurations.count)')"
+}
+foreach ($vnetConn in $subVnets) {
+    $vnetName = SetVnetName $vnetConn
+    foreach ($peering in $vnet.VirtualNetworkPeerings) {
+        $vnetList += $vnetName
+        $peervNet = $subVnets | Where-Object Id -eq $peering.RemoteVirtualNetwork.Id
+        $peerLabel = "vnet"
+        if ($peervNet) {
+            if ($peervNet.DhcpOptions) {
+                $peerName = $peervNet.Name
+            } else { 
+                $peerName = "$($peervNet.Name)-OffNet"
+            }
+        } else {
+            $peerName = (($peering.RemoteVirtualNetwork.Id).Split("/"))[8]
+            if ($peername -like "HV_*") {
+                $vHubname = $peerName.Split("_")[1] # This is required because the auto-generated name for vWan Hub peers is weird
+                $peerName = $vhubName.Substring(0,($vHubname.Length)-1)
+                $peerLabel = "vwanhub"
+            }
+        }
+        if ($vnetList -contains $peerName) {
+        } else {
+            if ($peering.AllowGatewayTransit -eq $true) {
+                "g.V().hasLabel('vnet').has('name', '$($vnetName)').addE('peering').to(g.V().hasLabel('$($peerLabel)').has('name', '$($peerName)'))"
+            } elseif ($peering.UseRemoteGateways -eq $true) {
+                "g.V().hasLabel('$($peerLabel)').has('name', '$($peerName)').addE('peering').to(g.V().hasLabel('vnet').has('name', '$($vnetName)'))"
             } else {
-                if ($peering.AllowGatewayTransit -eq $true) {
-                    $output += "    $($vnetName) }|--|| $($peerName) : peering"
-                } elseif ($peering.UseRemoteGateways -eq $true) {
-                    $output += "    $($peerName) }|--|| $($vnetName) : peering"
-                } else {
-                    $output += "    $($vnetName) |o--o| $($peerName) : peering"
-                }
+                "g.V().hasLabel('vnet').has('name', '$($vnetName)').addE('peering').to(g.V().hasLabel('$($peerLabel)').has('name', '$($peerName)'))"
             }
         }
     }
 }
+
 foreach ($erc in $subErc) {
     $output += "    $($erc.name) {"
     $output += "        resourcegroup $($erc.ResourceGroupName.Replace(".","-"))"
@@ -118,16 +113,6 @@ foreach ($erc in $subErc) {
     $output += "        location $($erc.location)"
     $output += "        type $($erc.Type.Replace("/","-").Replace(".","-"))"
     $output += "    }"
-}
-foreach ($vngConn in $subVngConns) {
-    if ($vngConn.VirtualNetworkGateway2) {
-        $output += "    $($vngConn.VirtualNetworkGateway2.Id.Split("/")[8]) ||--|| $($vngConn.VirtualNetworkGateway1.Id.Split("/")[8]) : connection"
-    } elseif ($vngConn.LocalNetworkGateway2) {
-        $lngList += $vngConn.LocalNetworkGateway2.Id.Split("/")[8]
-        $output += "    $($vngConn.LocalNetworkGateway2.Id.Split("/")[8]) ||--|| $($vngConn.VirtualNetworkGateway1.Id.Split("/")[8]) : connection"
-    } elseif ($vngConn.Peer) {
-        $output += "    $($vngConn.Peer.Id.Split("/")[8]) ||--|| $($vngConn.VirtualNetworkGateway1.Id.Split("/")[8]) : connection"
-    }
 }
 foreach ($lng in $subLngs) {
     if ($lngList -contains $lng.name) { # Removes LNGs that are not connected to anything
@@ -182,4 +167,15 @@ foreach ($vHub in $subVhubs) {
         $output += "    $($vhubErcConnection.ExpressRouteCircuitPeering.Id.Split("/")[8]) }|--|{ $($vHubName) : connection"
     }
 }
+foreach ($vngConn in $subVngConns) {
+    if ($vngConn.VirtualNetworkGateway2) {
+        $output += "    $($vngConn.VirtualNetworkGateway2.Id.Split("/")[8]) ||--|| $($vngConn.VirtualNetworkGateway1.Id.Split("/")[8]) : connection"
+    } elseif ($vngConn.LocalNetworkGateway2) {
+        $lngList += $vngConn.LocalNetworkGateway2.Id.Split("/")[8]
+        $output += "    $($vngConn.LocalNetworkGateway2.Id.Split("/")[8]) ||--|| $($vngConn.VirtualNetworkGateway1.Id.Split("/")[8]) : connection"
+    } elseif ($vngConn.Peer) {
+        $output += "    $($vngConn.Peer.Id.Split("/")[8]) ||--|| $($vngConn.VirtualNetworkGateway1.Id.Split("/")[8]) : connection"
+    }
+}
+
 $output
