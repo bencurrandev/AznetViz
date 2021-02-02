@@ -60,6 +60,7 @@ foreach ($sub in $subscriptions) {
     }
 }
 Select-AzSubscription $currentCon.Subscription | Out-Null
+$output = @()
 $vnetList = @()
 $lngList = @()
 $vhubList = @()
@@ -125,15 +126,16 @@ foreach ($vHub in $subVhubs) {
     }
     $vhubErcs = $subVhubErcGw | Where-Object {$_.VirtualHub.Id -eq $vHub.Id}
     foreach ($vhubErc in $vhubErcs) {
-        $vhubErcConnection = Get-AzExpressRouteConnection -ResourceGroupName $vhubErc.ResourceGroupName -ExpressRouteGatewayName $vhubErc.Name
-        $output += "    $($vhubErcConnection.ExpressRouteCircuitPeering.Id.Split("/")[8]) }|--|{ $($vHubName) : connection"
+        # $vhubErcConnection = Get-AzExpressRouteConnection -ResourceGroupName $vhubErc.ResourceGroupName -ExpressRouteGatewayName $vhubErc.Name
+        # $output += "    $($vhubErcConnection.ExpressRouteCircuitPeering.Id.Split("/")[8]) }|--|{ $($vHubName) : connection"
     }
 }
 
 
 foreach ($vnetConn in $subVnets) {
     $vnetName = SetVnetName $vnetConn
-    foreach ($peering in $vnet.VirtualNetworkPeerings) {
+    write-host $vnetName
+    foreach ($peering in $vnetConn.VirtualNetworkPeerings) {
         $vnetList += $vnetName
         $peervNet = $subVnets | Where-Object Id -eq $peering.RemoteVirtualNetwork.Id
         $peerLabel = "vnet"
@@ -154,11 +156,11 @@ foreach ($vnetConn in $subVnets) {
         if ($vnetList -contains $peerName) {
         } else {
             if ($peering.AllowGatewayTransit -eq $true) {
-                write-host "g.V().hasLabel('vnet').has('name', '$($vnetName)').addE('peering').to(g.V().hasLabel('$($peerLabel)').has('name', '$($peerName)'))"
+                write-host "g.V().hasLabel('vnet').has('name','$($vnetName)').addE('peering').to(g.V().hasLabel('$($peerLabel)').has('name','$($peerName)'))"
             } elseif ($peering.UseRemoteGateways -eq $true) {
-                write-host "g.V().hasLabel('$($peerLabel)').has('name', '$($peerName)').addE('peering').to(g.V().hasLabel('vnet').has('name', '$($vnetName)'))"
+                write-host "g.V().hasLabel('$($peerLabel)').has('name','$($peerName)').addE('peering').to(g.V().hasLabel('vnet').has('name','$($vnetName)'))"
             } else {
-                write-host "g.V().hasLabel('vnet').has('name', '$($vnetName)').addE('peering').to(g.V().hasLabel('$($peerLabel)').has('name', '$($peerName)'))"
+                write-host "g.V().hasLabel('vnet').has('name','$($vnetName)').addE('peering').to(g.V().hasLabel('$($peerLabel)').has('name','$($peerName)'))"
             }
         }
     }
