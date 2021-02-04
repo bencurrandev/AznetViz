@@ -138,7 +138,7 @@ foreach ($vHub in $subVhubs) {
         $azFirewallStatus = "disabled"
     }
     try {
-        Invoke-Gremlin @gremlinParams -Query "g.AddV('vhub').property('ResourceId','$($vHub.ResourceGroupName.Replace("/","-"))_$($vHub.name)').property('name','$($vHub.name)').property('resourcegroup','$($vHub.ResourceGroupName.Replace("/","-"))').property('subscription','$(($subscriptions | Where-Object Id -eq ($vHub.Id.Split("/")[2])).Name.Replace(" ","-").Replace("/","-"))').property('location','$($vHub.location)').property('type','$($vHub.Type.Replace("/","-"))').property('azFirewall','$($azFirewallStatus)').property('virtualWan','$($vwanName)')"
+        Invoke-Gremlin @gremlinParams -Query "g.AddV('vwanhub').property('ResourceId','$($vHub.ResourceGroupName.Replace("/","-"))_$($vHub.name)').property('name','$($vHub.name)').property('resourcegroup','$($vHub.ResourceGroupName.Replace("/","-"))').property('subscription','$(($subscriptions | Where-Object Id -eq ($vHub.Id.Split("/")[2])).Name.Replace(" ","-").Replace("/","-"))').property('location','$($vHub.location)').property('type','$($vHub.Type.Replace("/","-"))').property('azFirewall','$($azFirewallStatus)').property('virtualWan','$($vwanName)')"
     }
     catch {
         LogOutput "ERROR : [Line:$($_.InvocationInfo.ScriptLineNumber)]"
@@ -169,12 +169,15 @@ foreach ($vnetConn in $subVnets) {
         } else {
             $peerName = (($peering.RemoteVirtualNetwork.Id).Split("/"))[8]
             if ($peername -like "HV_*") {
-                $vHubname = $peerName.Split("_")[1] # This is required because the auto-generated name for vWan Hub peers is weird
-                $peerName = $vhubName.Substring(0,($vHubname.Length)-1)
+                $vHubname1 = $peerName.Split("_")[1] # This is required because the auto-generated name for vWan Hub peers is weird
+                $vHubname2 = $vHubname1.Substring(0,($vHubname1.Length)-1)
+                $peerName = ($subVhubs | where Name -like "$($vHubname2)*").Name
                 $peerLabel = "vwanhub"
             }
         }
+        # write-host "$($vnetName) - $($peerLabel) - $($peerName)"
         if ($vnetList -contains $peerName) {
+            # write-host "Already exists"
         } else {
             try {
                 if ($peering.AllowGatewayTransit -eq $true) {
@@ -195,7 +198,7 @@ foreach ($vnetConn in $subVnets) {
 
 foreach ($vngVnetConn in $subVngs) {
     $vngVnetId = ($vngVnetConn.IpConfigurations.subnet | Where-Object id -like "*GatewaySubnet*").Id
-    $vngVnet = ($vngVnetId.Split("/"))[8] -Replace '-(?:[0-9]{1,3}\.){3,4}[0-9]{1,3}', ''
+    $vngVnet = ($vngVnetId.Split("/"))[8]
     try {
         Invoke-Gremlin @gremlinParams -Query "g.V().hasLabel('vng').has('name','$($vngVnetConn.name)').addE('gateway').to(g.V().hasLabel('vnet').has('name','$($vngVnet)'))"
     }
@@ -224,7 +227,7 @@ foreach ($vngConn in $subVngConns) {
 foreach ($vHub in $subVhubs) {
     foreach ($vhubConn in $vhubList) {
         try {
-            Invoke-Gremlin @gremlinParams -Query "g.V().hasLabel('vhub').has('name','$($vhubConn)').addE('virtualwan').to(g.V().hasLabel('vhub').has('name','$($vHub.Name)'))"
+            Invoke-Gremlin @gremlinParams -Query "g.V().hasLabel('vwanhub').has('name','$($vhubConn)').addE('virtualwan').to(g.V().hasLabel('vwanhub').has('name','$($vHub.Name)'))"
         }
         catch {
             LogOutput "ERROR : [Line:$($_.InvocationInfo.ScriptLineNumber)]"
@@ -239,7 +242,7 @@ foreach ($vHub in $subVhubs) {
     foreach ($vhubVpn in $vhubVpns) {
         try {
             $vpnLinkName = $vhubVpn.Connections[0].name.Split("Connection-")[1]
-            Invoke-Gremlin @gremlinParams -Query "g.V().hasLabel('vpn').has('name','$($vpnLinkName)').addE('$($vhubVpn.Connections[0].vpnlinkconnections[0].name)').to(g.V().hasLabel('vhub').has('name','$($vHub.Name)'))"
+            Invoke-Gremlin @gremlinParams -Query "g.V().hasLabel('vpn').has('name','$($vpnLinkName)').addE('vpnlink').to(g.V().hasLabel('vwanhub').has('name','$($vHub.Name)'))"
         }
         catch {
             LogOutput "ERROR : [Line:$($_.InvocationInfo.ScriptLineNumber)]"
@@ -249,7 +252,7 @@ foreach ($vHub in $subVhubs) {
     $vhubErcConns = $subVhubErcConns | Where-Object {$_.RoutingConfiguration.AssociatedRouteTable.Id.Split("/")[8] -eq $vHub.Name }
     foreach ($vhubErcConn in $vhubErcConns) {
         try {
-            Invoke-Gremlin @gremlinParams -Query "g.V().hasLabel('erc').has('name','$($vhubErcConn.ExpressRouteCircuitPeering.Id.Split("/")[8])').addE('connection').to(g.V().hasLabel('vhub').has('name','$($vHub.Name)'))"
+            Invoke-Gremlin @gremlinParams -Query "g.V().hasLabel('erc').has('name','$($vhubErcConn.ExpressRouteCircuitPeering.Id.Split("/")[8])').addE('connection').to(g.V().hasLabel('vwanhub').has('name','$($vHub.Name)'))"
         }
         catch {
             LogOutput "ERROR : [Line:$($_.InvocationInfo.ScriptLineNumber)]"
