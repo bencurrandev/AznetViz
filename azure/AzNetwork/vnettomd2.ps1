@@ -1,5 +1,6 @@
-$subscriptions = Get-AzSubscription
 $currentCon = Get-AzContext
+$subscriptions = Get-AzSubscription -TenantId $currentCon.Tenant.Id
+$subVnets = @()
 $subErc = @()
 $subVngs = @()
 $subVngConns = @()
@@ -9,7 +10,7 @@ $subVhubs = @()
 $subVhubErcGw = @()
 $subVhubVpnGw = @()
 foreach ($sub in $subscriptions) {
-    Select-AzSubscription $sub.Id | Out-Null
+    Select-AzSubscription $sub.Id # | Out-Null
     $thisSubVnets = Get-AzVirtualNetwork
     $thisSubResources = Get-AzResource
     $subVnets += $thisSubVnets
@@ -173,4 +174,4 @@ foreach ($vHub in $subVhubs) {
         $output += "    $($vhubErcConnection.ExpressRouteCircuitPeering.Id.Split("/")[8]) }|--|{ $($vHubName) : connection"
     }
 }
-$output
+$output | Out-File .\woodsidetest.md 

@@ -1,3 +1,4 @@
+```mermaid
 erDiagram
     FMG-EUS-COR-VNT {
         resourcegroup FMG-EUS-COR-RG-NETWORK
@@ -295,3 +296,4 @@ erDiagram
     }
     FMG-EUS-COR-VWANHUB }|--|{ FMG-MAA-COR-VWANHUB : FMG-VWAN-HUB
     FMG-SYD-COR-VWANHUB }|--|{ FMG-MAA-COR-VWANHUB : FMG-VWAN-HUB
+```
