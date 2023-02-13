@@ -1,0 +1,34 @@
+# Created by https://www.toptal.com/developers/gitignore/api/powershell,visualstudiocode
+# Edit at https://www.toptal.com/developers/gitignore?templates=powershell,visualstudiocode
+
+### PowerShell ###
+# Exclude packaged modules
+*.zip
+
+# Exclude .NET assemblies from source
+*.dll
+
+# Additional subfolders for testing
+output/*
+snippet/*
+
+### VisualStudioCode ###
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix
+
+### VisualStudioCode Patch ###
+# Ignore all local history of files
+.history
+.ionide
+
+# End of https://www.toptal.com/developers/gitignore/api/powershell,visualstudiocode
