@@ -1,10 +1,13 @@
 Param(
-    [string]$outputName
+    [Parameter(Mandatory)]
+    [string]$outputFile,
+    [ValidateRange("svg", "png", "jpg", "gif", "imap", "cmapx", "jp2", "json", "pdf", "plain", "dot")]
+    [string]$outputFormat = "svg"
 )
 Import-Module PSGraph
 $currentCon = Get-AzContext
 $subscriptions = Get-AzSubscription -TenantId $currentCon.Tenant.Id
-$outputFile = "$outputName.svg"
+$outputFile = "$outputFile.$outputFormat"
 $subVnets = @()
 $subErc = @()
 $subVngs = @()
@@ -236,4 +239,4 @@ graph {
             Edge -From $vhubErcConn.ExpressRouteCircuitPeering.Id.Split("/")[8] -To $vHub.Name @{label="connection"}
         }
     } #>
-}  | Export-PSGraph -DestinationPath .\$outputFile -OutputFormat svg
+}  | Export-PSGraph -DestinationPath .\$outputFile -OutputFormat $outputFormat
