@@ -17,8 +17,8 @@ To install this project, you need to have Powershell Core and the Az Powershell 
 
 ### Parameters
 
-- `-OutputFile` - The name of the output file. This can be a relative or absolute path. If no path is specified, the file will be saved in the current directory. The default value is `AzNetViz.png`.
-- `-OutputFormat` - The format of the output file. This can be either `png` or `svg`. The default value is `svg`.
+- `-OutputFile` - (required) The name of the output file. This can be a relative or absolute path. If no path is specified, the file will be saved in the current directory. 
+- `-OutputFormat` - (optional) The format of the output file. The following list of formats are supported:
     - svg (default)
     - png
     - jpg
