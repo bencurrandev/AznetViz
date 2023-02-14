@@ -1,13 +1,13 @@
 Param(
     [Parameter(Mandatory)]
     [string]$outputFile,
-    [ValidateRange("svg", "png", "jpg", "gif", "imap", "cmapx", "jp2", "json", "pdf", "plain", "dot")]
+    [ValidateSet("svg","png","jpg","gif","imap","cmapx","jp2","json","pdf","plain","dot")]
     [string]$outputFormat = "svg"
 )
 Import-Module PSGraph
 $currentCon = Get-AzContext
 $subscriptions = Get-AzSubscription -TenantId $currentCon.Tenant.Id
-$outputFile = "$outputFile.$outputFormat"
+$outputFile = "$($outputFile).$($outputFormat)"
 $subVnets = @()
 $subErc = @()
 $subVngs = @()
@@ -50,7 +50,8 @@ foreach ($sub in $subscriptions) {
                 }
                 if ($vHub.ExpressRouteGateway.id) {
                     $ercGw = $vHub.ExpressRouteGateway.id.Split("/")
-                    $thisVhubErcGw += Get-AzExpressRouteGateway -ResourceGroupName $ercGw[4] -Name $ercGw[8]
+                    $thisVhubErcGw = @()
+                    $thisVhubErcGw = Get-AzExpressRouteGateway -ResourceGroupName $ercGw[4] -Name $ercGw[8]
                     $subVhubErcGw += $thisVhubErcGw
                     $subVhubErcConns += Get-AzExpressRouteConnection -ResourceGroupName $thisVhubErcGw.ResourceGroupName -ExpressRouteGatewayName $thisVhubErcGw.Name
                 }
@@ -61,7 +62,6 @@ foreach ($sub in $subscriptions) {
 }
 Select-AzSubscription $currentCon.Subscription | Out-Null
 $output = @()
-$vhubList = @()
 
 function SetDhcp ($setDhcp) {
     if ($setDhcp.DhcpOptions) {
@@ -221,11 +221,23 @@ graph {
         }
     }
 
-    foreach ($vHub in $subVhubs) {
-        foreach ($vhubConn in $vhubList) {
-            Edge -From $vhubConn -To $vHub.Name @{label="virtualwan"}
+    foreach ($vwan in $subVwan) {
+        $vhubList = [System.Collections.Generic.List[object]]::new()
+        foreach ($vHub in $subVhubs) {
+            if ($vHub.VirtualWan.Id -eq $vwan.Id) {
+                foreach ($vhubConn in $vhubList) {
+                    Edge -From $vhubConn.name -To $vHub.Name @{label="virtualwan"}
+                }
+                $vhubList.Add([PSCustomObject]@{
+                    name = $vHub.Name
+                    vwan = $vHub.VirtualWan.Id.Split("/")[8]
+                })
+            }
         }
-        $vhubList += $vHub.Name
+    }
+
+    foreach ($vHub in $subVhubs) {
+
         #foreach ($vnetConn in $vHub.VirtualNetworkConnections) {
         # TODO Add any missing vNet connections that may exist
         #}
