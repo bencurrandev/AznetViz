@@ -114,20 +114,6 @@ graph {
     foreach ($sub in $subscriptions) {
         SubGraph $sgcount -Attributes @{style='filled';color='lightgrey';label=$sub.Name} {
 
-            foreach ($vnet in $subVnets | Sort-Object VirtualNetworkPeerings -Descending | Where-Object SubscriptionId -eq $sub.Id) {
-                $vnetDhcp = SetDhcp $vnet
-                $vnetAddress = SetAddress $vnet
-                Entity -Name $vnet.Name -Show value @{
-                    resourcegroup = $vnet.ResourceGroupName
-                    subscription = ($subscriptions | Where-Object Id -eq $vnet.SubscriptionId).Name
-                    location = $vnet.location
-                    type = $vnet.Type
-                    ipconnected = $vnet.Subnets.IpConfigurations.count
-                    addressspace = $vnetAddress
-                    dns = $vnetDhcp
-                }
-            }
-
             $vwcount = 1000
             foreach ($vwan in $subVwan | Where-Object SubscriptionId -eq $sub.Id) {
                 SubGraph $vwcount -Attributes @{style='filled';color='darkgrey';label=$vwan.Name} {
@@ -185,6 +171,20 @@ graph {
                     location = $vng.location
                     type = $vng.Type
                     gatewayType = $vng.GatewayType
+                }
+            }
+
+            foreach ($vnet in $subVnets | Sort-Object VirtualNetworkPeerings -Descending | Where-Object SubscriptionId -eq $sub.Id) {
+                $vnetDhcp = SetDhcp $vnet
+                $vnetAddress = SetAddress $vnet
+                Entity -Name $vnet.Name -Show value @{
+                    resourcegroup = $vnet.ResourceGroupName
+                    subscription = ($subscriptions | Where-Object Id -eq $vnet.SubscriptionId).Name
+                    location = $vnet.location
+                    type = $vnet.Type
+                    ipconnected = $vnet.Subnets.IpConfigurations.count
+                    addressspace = $vnetAddress
+                    dns = $vnetDhcp
                 }
             }
         }
