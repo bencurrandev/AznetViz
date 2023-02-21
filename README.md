@@ -4,7 +4,13 @@ A Powershell script that will traverse your Azure subscription and create a diag
 
 ## Installation
 
-To install this project, you need to have Powershell Core and the Az Powershell module installed on your machine. Then, follow these steps:
+Prerequisites:
+- Powershell 7.0 or higher
+- Azure Powershell module
+- Graphviz
+- PSGraph Powershell module
+
+To install this script, you can do the following:
 
 - Clone this repository: `git clone https://github.com/bencurrandev/AzNetViz.git`
 - Go to the project directory: `cd AzNetViz`
@@ -12,13 +18,25 @@ To install this project, you need to have Powershell Core and the Az Powershell 
 ## Usage
 
 - Login to Azure: `Connect-AzAccount` (you will be prompted to login to Azure) *Note: If you are a member of multiple AzureAD tenants, you will need to specify the tenant you want to use: `Connect-AzAccount -TenantId <tenant-id>`*
-- Run the script: `.\AzNetViz.ps1 -OutputFile <output-file-name> -OutputFormat <output-file-format>`
+- Run the script: `.\AzNetViz.ps1 -OutputFile <output-file-name> -OutputFormat <output-file-format> -Layout <layout>`
 - Open the output file in your preferred image viewer
 
 ### Parameters
 
 - `-OutputFile` - (required) The name of the output file. This can be a relative or absolute path. If no path is specified, the file will be saved in the current directory. 
 - `-OutputFormat` - (optional) The format of the output file. The following list of formats are supported:
+    - svg (default)
+    - png
+    - jpg
+    - gif
+    - imap
+    - cmapx
+    - jp2
+    - json
+    - pdf
+    - plain
+    - dot
+- `-Layout` - (optional) The layout of the output file. The following list of formats are supported:
     - svg (default)
     - png
     - jpg

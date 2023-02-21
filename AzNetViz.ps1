@@ -2,7 +2,9 @@ Param(
     [Parameter(Mandatory)]
     [string]$outputFile,
     [ValidateSet("svg","png","jpg","gif","imap","cmapx","jp2","json","pdf","plain","dot")]
-    [string]$outputFormat = "svg"
+    [string]$outputFormat = "svg",
+    [ValidateSet("Hierarchical","radial","circular","SpringModelSmall","SpringModelMedium","SpringModelLarge","fdp","sfdp","neato","dot")]
+    [string]$layout = "Hierarchical"
 )
 Import-Module PSGraph
 $currentCon = Get-AzContext
@@ -101,94 +103,99 @@ function SetAddress ($setAddress) {
 }
 function LogOutput ($message) {
     $output = "[$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss.fff'))] : $message"
-    write-host $output
+    Write-Output $output
 }
 
 # ======== Graph Generation ========
 $sgcount = 0
-graph {
+graph network {
     node @{shape="box"}
 
 # ======== Node loops ========
 
     foreach ($sub in $subscriptions) {
-        SubGraph $sgcount -Attributes @{style='filled';color='lightgrey';label=$sub.Name} {
+        if ((($subVwan | Where-Object SubscriptionId -eq $sub.Id).count) + (($subErc | Where-Object SubscriptionId -eq $sub.Id).count) + (($subLngs | Where-Object SubscriptionId -eq $sub.Id).count) + (($subVngs | Where-Object SubscriptionId -eq $sub.Id).count) + (($subVnets | Where-Object SubscriptionId -eq $sub.Id).count) -gt 0) {
+            SubGraph $sgcount -Attributes @{style='filled';color='lightgrey';label=$sub.Name} {
+                $vwcount = 1000
 
-            $vwcount = 1000
-            foreach ($vwan in $subVwan | Where-Object SubscriptionId -eq $sub.Id) {
-                SubGraph $vwcount -Attributes @{style='filled';color='darkgrey';label=$vwan.Name} {
-                    foreach ($vHub in $subVhubs | where-object {$_.VirtualWan.Id -eq $vwan.Id}) {
-                        $vwanName = $vHub.VirtualWan.Id.Split("/")[8]
-                        if ($vHub.AzureFirewall.Id) {
-                            $azFirewallStatus = "enabled"
-                        } else {
-                            $azFirewallStatus = "disabled"
-                        }
-                        Entity -Name $vHub.name -Show value @{
-                            resourcegroup = $vHub.ResourceGroupName
-                            subscription = ($subscriptions | Where-Object Id -eq ($vHub.Id.Split("/")[2])).Name
-                            location = $vHub.location
-                            type = $vHub.Type
-                            azFirewall = $azFirewallStatus
-                            virtualWan = $vwanName
-                        }
-                        foreach ($vhubVpn in $subVhubVpnGw | Where-Object {$_.VirtualHub.Id -eq $vHub.Id}) {
-                            $vpnLinkName = $vhubVpn.Connections[0].name.Split("Connection-")[1]
-                            Entity -Name $vpnLinkName -Show value @{
-                                resourcegroup = $vHub.ResourceGroupName
-                                subscription = ($subscriptions | Where-Object Id -eq ($vHub.Id.Split("/")[2])).Name
-                                location = $vHub.location
-                                type = "Microsoft.Network/vpnGateways/vpnConnections"
-                            }
+                foreach ($vnet in $subVnets | Sort-Object VirtualNetworkPeerings -Descending | Where-Object SubscriptionId -eq $sub.Id) {
+                    if (!($vnet.Name -eq "workers-vnet")) {
+                        $vnetDhcp = SetDhcp $vnet
+                        $vnetAddress = SetAddress $vnet
+                        Entity -Name $vnet.Name -Show value @{
+                            resourcegroup = $vnet.ResourceGroupName
+                            subscription = ($subscriptions | Where-Object Id -eq $vnet.SubscriptionId).Name
+                            location = $vnet.location
+                            type = $vnet.Type
+                            ipconnected = $vnet.Subnets.IpConfigurations.count
+                            addressspace = $vnetAddress
+                            dns = $vnetDhcp
                         }
                     }
                 }
-                $vwcount++
-            }
-            
-            foreach ($erc in $subErc | Where-Object SubscriptionId -eq $sub.Id) {
-                Entity -Name $erc.name -Show value @{
-                    resourcegroup = $erc.ResourceGroupName
-                    subscription = ($subscriptions | Where-Object Id -eq ($erc.Id.Split("/")[2])).Name
-                    location = $erc.location
-                    type = $erc.Type
-                }
-            }
 
-            foreach ($lng in $subLngs | Where-Object SubscriptionId -eq $sub.Id) {
-                Entity -Name $lng.name -Show value @{
-                    resourcegroup = $lng.ResourceGroupName
-                    subscription = ($subscriptions | Where-Object Id -eq ($lng.Id.Split("/")[2])).Name
-                    location = $lng.location
-                    type = $lng.Type
+                foreach ($vwan in $subVwan | Where-Object SubscriptionId -eq $sub.Id) {
+                    SubGraph $vwcount -Attributes @{style='filled';color='darkgrey';label=$vwan.Name} {
+                        foreach ($vHub in $subVhubs | where-object {$_.VirtualWan.Id -eq $vwan.Id}) {
+                            $vwanName = $vHub.VirtualWan.Id.Split("/")[8]
+                            if ($vHub.AzureFirewall.Id) {
+                                $azFirewallStatus = "enabled"
+                            } else {
+                                $azFirewallStatus = "disabled"
+                            }
+                            Entity -Name $vHub.name -Show value @{
+                                resourcegroup = $vHub.ResourceGroupName
+                                subscription = ($subscriptions | Where-Object Id -eq ($vHub.Id.Split("/")[2])).Name
+                                location = $vHub.location
+                                type = $vHub.Type
+                                azFirewall = $azFirewallStatus
+                                virtualWan = $vwanName
+                            }
+                            foreach ($vhubVpn in $subVhubVpnGw | Where-Object {$_.VirtualHub.Id -eq $vHub.Id}) {
+                                $vpnLinkName = $vhubVpn.Connections[0].name.Split("Connection-")[1]
+                                Entity -Name $vpnLinkName -Show value @{
+                                    resourcegroup = $vHub.ResourceGroupName
+                                    subscription = ($subscriptions | Where-Object Id -eq ($vHub.Id.Split("/")[2])).Name
+                                    location = $vHub.location
+                                    type = "Microsoft.Network/vpnGateways/vpnConnections"
+                                }
+                            }
+                        }
+                    }
+                    $vwcount++
                 }
-            }
 
-            foreach ($vng in $subVngs | Where-Object SubscriptionId -eq $sub.Id) {
-                Entity -Name $vng.name -Show value @{
-                    resourcegroup = $vng.ResourceGroupName
-                    subscription = ($subscriptions | Where-Object Id -eq ($vng.Id.Split("/")[2])).Name
-                    location = $vng.location
-                    type = $vng.Type
-                    gatewayType = $vng.GatewayType
+                foreach ($erc in $subErc | Where-Object SubscriptionId -eq $sub.Id) {
+                    Entity -Name $erc.name -Show value @{
+                        color="red"
+                        resourcegroup = $erc.ResourceGroupName
+                        subscription = ($subscriptions | Where-Object Id -eq ($erc.Id.Split("/")[2])).Name
+                        location = $erc.location
+                        type = $erc.Type
+                    }
                 }
-            }
 
-            foreach ($vnet in $subVnets | Sort-Object VirtualNetworkPeerings -Descending | Where-Object SubscriptionId -eq $sub.Id) {
-                $vnetDhcp = SetDhcp $vnet
-                $vnetAddress = SetAddress $vnet
-                Entity -Name $vnet.Name -Show value @{
-                    resourcegroup = $vnet.ResourceGroupName
-                    subscription = ($subscriptions | Where-Object Id -eq $vnet.SubscriptionId).Name
-                    location = $vnet.location
-                    type = $vnet.Type
-                    ipconnected = $vnet.Subnets.IpConfigurations.count
-                    addressspace = $vnetAddress
-                    dns = $vnetDhcp
+                foreach ($lng in $subLngs | Where-Object SubscriptionId -eq $sub.Id) {
+                    Entity -Name $lng.name -Show value @{
+                        resourcegroup = $lng.ResourceGroupName
+                        subscription = ($subscriptions | Where-Object Id -eq ($lng.Id.Split("/")[2])).Name
+                        location = $lng.location
+                        type = $lng.Type
+                    }
+                }
+
+                foreach ($vng in $subVngs | Where-Object SubscriptionId -eq $sub.Id) {
+                    Entity -Name $vng.name -Show value @{
+                        resourcegroup = $vng.ResourceGroupName
+                        subscription = ($subscriptions | Where-Object Id -eq ($vng.Id.Split("/")[2])).Name
+                        location = $vng.location
+                        type = $vng.Type
+                        gatewayType = $vng.GatewayType
+                    }
                 }
             }
-        }
         $sgcount++
+        }
     }
 
     # ======== Connection loops ========
@@ -207,21 +214,11 @@ graph {
                     $peerName = ($subVhubs | Where-Object Name -like "$($vHubname2)*").Name
                 }
             }
-            if ($peerLog.Contains("$($peerName) -> $($vnetConn.Name)")) {
-                # do nothing
-            } else {
+            if (!(($peerLog.Contains("$($peerName) -> $($vnetConn.Name)")) -or ($peerName -eq "workers-vnet") -or ($vnetConn.Name -eq "workers-vnet"))) {
                 Edge -From $vnetConn.Name -To $peerName @{label="peering";arrowhead="none"}
-                $peerLog.Add("$($vnetConn.Name) -> $($peerName)")
+                $peerLog += "$($vnetConn.Name) -> $($peerName)"
+                # $peerLog.Add("$($vnetConn.Name) -> $($peerName)")
             }
-            <#
-            if ($peering.AllowGatewayTransit -eq $true) {
-                Edge -From $vnetConn.Name -To $peerName @{label="gatewaytransit";arrowhead="none"} #TODO: Add label for transit
-            } elseif ($peering.UseRemoteGateways -eq $true) {
-                Edge -From $vnetConn.Name -To $peerName @{label="remotegateway";arrowhead="none"}
-            } else {
-                Edge -From $vnetConn.Name -To $peerName @{label="peering";arrowhead="none"}
-            }
-            #>
         }
     }
 
@@ -241,23 +238,6 @@ graph {
         }
     }
 
-    <#
-    foreach ($vwan in $subVwan) {
-        $vhubList = [System.Collections.Generic.List[object]]::new()
-        foreach ($vHub in $subVhubs) {
-            if ($vHub.VirtualWan.Id -eq $vwan.Id) {
-                foreach ($vhubConn in $vhubList) {
-                    Edge -From $vhubConn.name -To $vHub.Name @{label="virtualwan"}
-                }
-                $vhubList.Add([PSCustomObject]@{
-                    name = $vHub.Name
-                    vwan = $vHub.VirtualWan.Id.Split("/")[8]
-                })
-            }
-        }
-    }
-    #>
-
     foreach ($vHub in $subVhubs) {
         #foreach ($vnetConn in $vHub.VirtualNetworkConnections) {
         # TODO Add any missing vNet connections that may exist
@@ -272,4 +252,5 @@ graph {
             Edge -From $vHub.Name -To $vhubErcConn.ExpressRouteCircuitPeering.Id.Split("/")[8] @{label="connection";arrowhead="none"}
         }
     } #>
-}  | Export-PSGraph -DestinationPath .\$outputFile -OutputFormat $outputFormat
+}  | Export-PSGraph -DestinationPath $outputFile -OutputFormat $outputFormat -LayoutEngine $layout
+$peerLog.count
