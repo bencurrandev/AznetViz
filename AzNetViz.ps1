@@ -3,7 +3,7 @@ Param(
     [string]$outputFile,
     [ValidateSet("svg","png","jpg","gif","imap","cmapx","jp2","json","pdf","plain","dot")]
     [string]$outputFormat = "svg",
-    [ValidateSet("Hierarchical","radial","circular","SpringModelSmall","SpringModelMedium","SpringModelLarge","fdp","sfdp","neato","dot")]
+    [ValidateSet("Hierarchical","radial","circular","SpringModelSmall","SpringModelMedium","SpringModelLarge","fdp","sfdp","neato","dot","twopi","circo","patchwork","nop")]
     [string]$layout = "Hierarchical"
 )
 Import-Module PSGraph

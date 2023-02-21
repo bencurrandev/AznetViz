@@ -36,18 +36,17 @@ To install this script, you can do the following:
     - pdf
     - plain
     - dot
-- `-Layout` - (optional) The layout of the output file. The following list of formats are supported:
-    - svg (default)
-    - png
-    - jpg
-    - gif
-    - imap
-    - cmapx
-    - jp2
-    - json
-    - pdf
-    - plain
-    - dot
+- `-Layout` - (optional) The layout of the output file. The following list of Graphviz layouts are supported:
+    - Hierarchical/dot (default) - Top down layered tree
+    - radial/twopi - Radial tree
+    - circular/circo - Circular tree
+    - SpringModelSmall/neato - Spring model
+    - SpringModelMedium - Spring model
+    - SpringModelLarge - Spring model
+    - fdp - Force directed placement
+    - sfdp - Scalable force directed placement
+    - patchwork - clustered graph using a squarified treemap
+    - nop - No layout
 
 ## Contributing
 
