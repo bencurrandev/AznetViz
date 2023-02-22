@@ -108,6 +108,7 @@ function LogOutput ($message) {
 
 # ======== Graph Generation ========
 $sgcount = 0
+$vwcount = 1000
 graph network {
     node @{shape="box"}
 
@@ -116,7 +117,6 @@ graph network {
     foreach ($sub in $subscriptions) {
         if ((($subVwan | Where-Object SubscriptionId -eq $sub.Id).count) + (($subErc | Where-Object SubscriptionId -eq $sub.Id).count) + (($subLngs | Where-Object SubscriptionId -eq $sub.Id).count) + (($subVngs | Where-Object SubscriptionId -eq $sub.Id).count) + (($subVnets | Where-Object SubscriptionId -eq $sub.Id).count) -gt 0) {
             SubGraph $sgcount -Attributes @{style='filled';color='lightgrey';label=$sub.Name} {
-                $vwcount = 1000
 
                 foreach ($vnet in $subVnets | Sort-Object VirtualNetworkPeerings -Descending | Where-Object SubscriptionId -eq $sub.Id) {
                     if (!($vnet.Name -eq "workers-vnet")) {
