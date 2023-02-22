@@ -167,7 +167,6 @@ graph network {
 
                 foreach ($erc in $subErc | Where-Object SubscriptionId -eq $sub.Id) {
                     Entity -Name $erc.name -Show value @{
-                        color="red"
                         resourcegroup = $erc.ResourceGroupName
                         subscription = ($subscriptions | Where-Object Id -eq ($erc.Id.Split("/")[2])).Name
                         location = $erc.location
